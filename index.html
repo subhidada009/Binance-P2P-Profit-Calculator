@@ -1,0 +1,92 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>P2P Profit Calculator</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Tajawal:wght@300;400;500;700;800&display=swap" rel="stylesheet">
+    <script>
+      tailwind.config = {
+        darkMode: 'class',
+        theme: {
+          extend: {
+            fontFamily: {
+              sans: ['Tajawal', 'sans-serif'],
+            },
+            colors: {
+              primary: 'var(--color-primary)',
+              'primary-hover': 'var(--color-primary-hover)',
+              background: 'var(--color-background)',
+              card: 'var(--color-card)',
+              'card-border': 'var(--color-card-border)',
+              text: {
+                main: 'var(--color-text-main)',
+                muted: 'var(--color-text-muted)',
+                inverted: 'var(--color-text-inverted)'
+              },
+              // Keep legacy for compatibility if needed, but map to variables
+              binance: {
+                yellow: 'var(--color-primary)',
+                black: 'var(--color-card)', 
+                gray: 'var(--color-card-border)',
+                light: '#FAFAFA'
+              }
+            }
+          },
+        },
+      }
+    </script>
+    <style>
+      :root {
+        --color-primary: #F0B90B;
+        --color-primary-hover: #D0A009;
+        --color-background: #111827;
+        --color-card: #1E2329;
+        --color-card-border: #374151;
+        --color-text-main: #FFFFFF;
+        --color-text-muted: #9CA3AF;
+        --color-text-inverted: #000000;
+      }
+      
+      body {
+        background-color: var(--color-background);
+        color: var(--color-text-main);
+        transition: background-color 0.3s, color 0.3s;
+      }
+      
+      /* Custom scrollbar for better aesthetics */
+      ::-webkit-scrollbar {
+        width: 8px;
+      }
+      ::-webkit-scrollbar-track {
+        background: var(--color-background);
+      }
+      ::-webkit-scrollbar-thumb {
+        background: var(--color-primary);
+        border-radius: 4px;
+      }
+    </style>
+  <script type="importmap">
+{
+  "imports": {
+    "react-dom/": "https://aistudiocdn.com/react-dom@^19.2.0/",
+    "react/": "https://aistudiocdn.com/react@^19.2.0/",
+    "react": "https://aistudiocdn.com/react@^19.2.0",
+    "@google/genai": "https://aistudiocdn.com/@google/genai@^1.30.0",
+    "lucide-react": "https://aistudiocdn.com/lucide-react@^0.554.0",
+    "recharts": "https://aistudiocdn.com/recharts@^3.5.0",
+    "path": "https://aistudiocdn.com/path@^0.12.7",
+    "vite": "https://aistudiocdn.com/vite@^7.2.4",
+    "@vitejs/plugin-react": "https://aistudiocdn.com/@vitejs/plugin-react@^5.1.1",
+    "react-router-dom": "https://aistudiocdn.com/react-router-dom@^7.9.6"
+  }
+}
+</script>
+<link rel="stylesheet" href="/index.css">
+</head>
+  <body>
+    <div id="root"></div>
+  <script type="module" src="/index.tsx"></script>
+</body>
+</html>
