@@ -1,9 +1,29 @@
 import { GoogleGenAI } from "@google/genai";
 import { TradeInputs, TradeResult } from "../types";
 
-const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
+const getGeminiClient = (): GoogleGenAI | null => {
+  const apiKey = process.env.API_KEY || process.env.GEMINI_API_KEY;
+  if (!apiKey) {
+    return null;
+  }
 
-export const analyzeTradeScenario = async (inputs: TradeInputs, results: TradeResult): Promise<string> => {
+  try {
+    return new GoogleGenAI({ apiKey });
+  } catch (error) {
+    console.error("Gemini client init error:", error);
+    return null;
+  }
+};
+
+export const analyzeTradeScenario = async (
+  inputs: TradeInputs,
+  results: TradeResult
+): Promise<string> => {
+  const ai = getGeminiClient();
+  if (!ai) {
+    return "Gemini API key is missing. Add GEMINI_API_KEY in .env.local then restart dev server.";
+  }
+
   try {
     const prompt = `
       تصرف كمحلل خبير في تداول العملات الرقمية و P2P (نظير لنظير).
@@ -25,16 +45,16 @@ export const analyzeTradeScenario = async (inputs: TradeInputs, results: TradeRe
     `;
 
     const response = await ai.models.generateContent({
-      model: 'gemini-2.5-flash',
+      model: "gemini-2.5-flash",
       contents: prompt,
       config: {
-        thinkingConfig: { thinkingBudget: 0 } // Fast response needed
-      }
+        thinkingConfig: { thinkingBudget: 0 },
+      },
     });
 
     return response.text || "لا يمكن الحصول على تحليل في الوقت الحالي.";
   } catch (error) {
     console.error("Gemini Analysis Error:", error);
-    return "حدث خطأ أثناء الاتصال بخدمة الذكاء الاصطناعي. يرجى التحقق من مفتاح API والمحاولة مرة أخرى.";
+    return "حدث خطأ أثناء الاتصال بخدمة الذكاء الاصطناعي. تحقق من المفتاح وحاول مرة أخرى.";
   }
 };

@@ -4,7 +4,7 @@ import { TradeStats } from './TradeStats';
 import { TradeFilters } from './TradeFilters';
 import { TradeTable } from './TradeTable';
 import { X } from 'lucide-react';
-import { parseCSV } from '../../utils/tradeLogic';
+import { parseTradeFile } from '../../utils/tradeLogic';
 
 interface TradeHistoryProps {
   rawData: RawTradeData[];
@@ -50,6 +50,10 @@ export const TradeHistory: React.FC<TradeHistoryProps> = ({
   guideT
 }) => {
   const [showManualModal, setShowManualModal] = useState(false);
+  const [lastImportSummary, setLastImportSummary] = useState<{
+    files: number;
+    importedRows: number;
+  } | null>(null);
 
   // Manual Form State
   const [mType, setMType] = useState('Buy');
@@ -90,27 +94,19 @@ export const TradeHistory: React.FC<TradeHistoryProps> = ({
     }
   };
 
-  const handleProcessFiles = useCallback((files: File[]) => {
-    let allData: RawTradeData[] = [...rawData];
-    let processed = 0;
-
-    files.forEach(file => {
-      // Remove existing data from this file if we are re-uploading/replacing it
-      allData = allData.filter(r => r.sourceFile !== file.name);
-
-      const reader = new FileReader();
-      reader.onload = (ev) => {
-        const text = ev.target?.result as string;
-        const parsed = parseCSV(text, file.name);
-        allData = [...allData, ...parsed];
-        processed++;
-        if (processed === files.length) {
-          setRawData(allData);
-        }
-      };
-      reader.readAsText(file);
-    });
-  }, [rawData, setRawData]);
+  const handleProcessFiles = useCallback(async (files: File[]) => {
+    try {
+      const parsedByFile = await Promise.all(files.map((file) => parseTradeFile(file)));
+      const importedRows = parsedByFile.reduce((sum, rows) => sum + rows.length, 0);
+      setRawData((prev) => [...prev, ...parsedByFile.flat()]);
+      setLastImportSummary({
+        files: files.length,
+        importedRows
+      });
+    } catch (error) {
+      console.error("Failed to process files", error);
+    }
+  }, [setRawData]);
 
   const handleRemoveFile = (fileName: string) => {
     if (window.confirm(`Delete all trades from file: ${fileName}?`)) {
@@ -134,7 +130,8 @@ export const TradeHistory: React.FC<TradeHistoryProps> = ({
       "Taker Fee": "0",
       manual: true
     };
-    setRawData([...rawData, newTrade]);
+    setRawData(prev => [...prev, newTrade]);
+    setLastImportSummary(null);
     setShowManualModal(false);
     // Reset form
     setMPrice('');
@@ -164,6 +161,24 @@ export const TradeHistory: React.FC<TradeHistoryProps> = ({
         t={t}
         guideT={guideT}
       />
+
+      {lastImportSummary && (
+        <div className="bg-emerald-900/20 border border-emerald-700/40 rounded-lg px-4 py-3 text-sm text-emerald-300">
+          Imported {lastImportSummary.importedRows} rows from {lastImportSummary.files} file(s).
+        </div>
+      )}
+
+      {(summary.sellWithoutCostCount || 0) > 0 && (
+        <div className="bg-amber-900/20 border border-amber-700/40 rounded-lg px-4 py-3 text-sm text-amber-200">
+          {summary.sellWithoutCostCount} sell order(s) have missing historical buy cost.
+          Profit for these orders is marked as unknown.
+          {(summary.unmatchedSellQty && parseFloat(summary.unmatchedSellQty) > 0) && (
+            <span className="ml-2 text-amber-300">
+              Missing quantity: {summary.unmatchedSellQty} {asset}
+            </span>
+          )}
+        </div>
+      )}
 
       <TradeTable trades={trades} onDelete={handleDelete} t={t} />
 

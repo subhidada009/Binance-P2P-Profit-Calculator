@@ -8,7 +8,7 @@ import { OnboardingTour } from './components/OnboardingTour';
 import { Sidebar } from './components/Sidebar';
 import { TradeInputs, TradeResult, RawTradeData, AppLanguage, AppTheme, FIAT_CURRENCIES } from './types';
 import { Calculator, History, LayoutDashboard, PieChart, Settings, Globe, Palette, Menu } from 'lucide-react';
-import { parseCSV, calculateTradeLogic } from './utils/tradeLogic';
+import { calculateTradeLogic, parseTradeFile } from './utils/tradeLogic';
 import { translations } from './utils/translations';
 
 const App: React.FC = () => {
@@ -188,7 +188,8 @@ const App: React.FC = () => {
     const saved = localStorage.getItem('p2p_trade_data');
     if (saved) {
       try {
-        setRawData(JSON.parse(saved));
+        const parsed = JSON.parse(saved) as RawTradeData[];
+        setRawData(parsed);
       } catch (e) {
         console.error("Error loading data", e);
       }
@@ -268,8 +269,42 @@ const App: React.FC = () => {
       alert("No data to export.");
       return;
     }
-    const csvContent = "data:text/csv;charset=utf-8," 
-      + rawData.map(e => Object.values(e).join(",")).join("\n");
+
+    const exportHeaders: (keyof RawTradeData)[] = [
+      "Order Number",
+      "Order Type",
+      "Asset Type",
+      "Fiat Type",
+      "Total Price",
+      "Price",
+      "Quantity",
+      "Exchange rate",
+      "Maker Fee",
+      "Taker Fee",
+      "Counterparty",
+      "Couterparty",
+      "Status",
+      "Created Time",
+      "sourceFile",
+      "manual",
+    ];
+
+    const escapeCSVValue = (value: unknown) => {
+      const text = String(value ?? "");
+      if (text.includes('"') || text.includes(',') || text.includes('\n')) {
+        return `"${text.replace(/"/g, '""')}"`;
+      }
+      return text;
+    };
+
+    const rows = [
+      exportHeaders.join(","),
+      ...rawData.map((row) =>
+        exportHeaders.map((header) => escapeCSVValue(row[header])).join(",")
+      ),
+    ];
+
+    const csvContent = "data:text/csv;charset=utf-8," + rows.join("\n");
     const encodedUri = encodeURI(csvContent);
     const link = document.createElement("a");
     link.setAttribute("href", encodedUri);
@@ -280,7 +315,7 @@ const App: React.FC = () => {
   };
 
   // --- Trade Processing Logic (Shared) ---
-  const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const inputElement = e.target;
     const files = inputElement.files;
     
@@ -289,22 +324,12 @@ const App: React.FC = () => {
     const currentFiles = Array.from(files);
     inputElement.value = '';
 
-    let allData: RawTradeData[] = [...rawData];
-    let processed = 0;
-
-    currentFiles.forEach(file => {
-      const reader = new FileReader();
-      reader.onload = (ev) => {
-        const text = ev.target?.result as string;
-        const parsed = parseCSV(text);
-        allData = [...allData, ...parsed];
-        processed++;
-        if (processed === currentFiles.length) {
-          setRawData(allData);
-        }
-      };
-      reader.readAsText(file);
-    });
+    try {
+      const parsedFiles = await Promise.all(currentFiles.map((file) => parseTradeFile(file)));
+      setRawData((prev) => [...prev, ...parsedFiles.flat()]);
+    } catch (error) {
+      console.error("Failed to parse uploaded files", error);
+    }
   };
 
   // Calculate Trades for History and Analysis

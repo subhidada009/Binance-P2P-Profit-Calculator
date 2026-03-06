@@ -117,7 +117,7 @@ export const TradeFilters: React.FC<TradeFiltersProps> = ({
         <input 
           type="file" 
           ref={fileInputRef}
-          accept=".csv,.txt" 
+          accept=".csv,.txt,.pdf,.xlsx,.xls,.xlsm,.xlsb" 
           multiple 
           className="hidden" 
           onChange={handleFileInput} 

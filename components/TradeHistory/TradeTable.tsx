@@ -17,33 +17,30 @@ export const TradeTable: React.FC<TradeTableProps> = ({ trades, onDelete, t }) =
   const [sortDirection, setSortDirection] = useState<SortDirection>(null);
   const itemsPerPage = 10;
 
-  // Reset pagination when trades change significantly (e.g. clear all)
   useEffect(() => {
     const maxPage = Math.ceil(trades.length / itemsPerPage);
     if (currentPage > maxPage && maxPage > 0) {
-        setCurrentPage(maxPage);
+      setCurrentPage(maxPage);
     } else if (trades.length === 0) {
-        setCurrentPage(1);
+      setCurrentPage(1);
     }
-  }, [trades.length, itemsPerPage]);
+  }, [trades.length, itemsPerPage, currentPage]);
 
-  // Handle sorting logic
   const handleSort = (key: SortKey) => {
     if (sortKey === key) {
       if (sortDirection === 'asc') {
         setSortDirection('desc');
       } else if (sortDirection === 'desc') {
-        setSortDirection(null); // Reset
+        setSortDirection(null);
         setSortKey(null);
       }
     } else {
       setSortKey(key);
       setSortDirection('asc');
     }
-    setCurrentPage(1); // Reset to first page on sort
+    setCurrentPage(1);
   };
 
-  // Sort trades based on current configuration
   const sortedTrades = useMemo(() => {
     if (!sortKey || !sortDirection) return trades;
 
@@ -57,14 +54,15 @@ export const TradeTable: React.FC<TradeTableProps> = ({ trades, onDelete, t }) =
         case 'price':
           result = parseFloat(a.price) - parseFloat(b.price);
           break;
-        case 'profit':
-          // Handle "—" cases for profit
-          const profitA = a.profit === '—' ? -Infinity : parseFloat(a.profit);
-          const profitB = b.profit === '—' ? -Infinity : parseFloat(b.profit);
+        case 'profit': {
+          const parsedA = parseFloat(a.profit);
+          const parsedB = parseFloat(b.profit);
+          const profitA = Number.isFinite(parsedA) ? parsedA : -Infinity;
+          const profitB = Number.isFinite(parsedB) ? parsedB : -Infinity;
           result = profitA - profitB;
           break;
+        }
         case 'order':
-          // Sort by type (Buy/Sell) first
           result = a.type.localeCompare(b.type);
           break;
         case 'counterparty':
@@ -76,17 +74,15 @@ export const TradeTable: React.FC<TradeTableProps> = ({ trades, onDelete, t }) =
     });
   }, [trades, sortKey, sortDirection]);
 
-  // Pagination logic
   const totalPages = Math.ceil(sortedTrades.length / itemsPerPage);
   const start = (currentPage - 1) * itemsPerPage;
   const currentTrades = sortedTrades.slice(start, start + itemsPerPage);
 
-  const handlePrev = () => setCurrentPage(p => Math.max(1, p - 1));
-  const handleNext = () => setCurrentPage(p => Math.min(totalPages, p + 1));
+  const handlePrev = () => setCurrentPage((p) => Math.max(1, p - 1));
+  const handleNext = () => setCurrentPage((p) => Math.min(totalPages, p + 1));
 
-  // Helper for Header Cell
-  const HeaderCell = ({ label, sortKeyName }: { label: string, sortKeyName: SortKey }) => (
-    <th 
+  const HeaderCell = ({ label, sortKeyName }: { label: string; sortKeyName: SortKey }) => (
+    <th
       className="p-4 font-medium whitespace-nowrap cursor-pointer hover:bg-gray-700/50 transition-colors select-none group"
       onClick={() => handleSort(sortKeyName)}
     >
@@ -121,28 +117,34 @@ export const TradeTable: React.FC<TradeTableProps> = ({ trades, onDelete, t }) =
           <tbody className="divide-y divide-gray-800">
             {currentTrades.length === 0 ? (
               <tr>
-                <td colSpan={7} className="p-8 text-center text-gray-500">لا توجد سجلات تداول</td>
+                <td colSpan={7} className="p-8 text-center text-gray-500">
+                  No trade records
+                </td>
               </tr>
             ) : (
               currentTrades.map((trade) => {
-                const profitVal = parseFloat(trade.profit);
-                const isProfit = !isNaN(profitVal) && profitVal >= 0;
-                
+                const parsedProfit = parseFloat(trade.profit);
+                const hasNumericProfit = Number.isFinite(parsedProfit);
+                const isProfit = hasNumericProfit && parsedProfit >= 0;
+
                 return (
                   <tr key={trade.id + trade.orderNo} className="hover:bg-gray-800/50 transition-colors">
                     <td className="p-4 text-gray-500">{trade.id}</td>
                     <td className="p-4 text-gray-300 font-mono text-xs whitespace-nowrap" dir="ltr">{trade.time}</td>
                     <td className={`p-4 font-bold whitespace-nowrap ${trade.type === 'buy' ? 'text-green-400' : 'text-red-400'}`}>
                       {trade.order}
-                      {trade.manual && <span className="mr-2 text-[10px] bg-gray-700 px-1 rounded text-gray-300">يدوي</span>}
+                      {trade.manual && <span className="mr-2 text-[10px] bg-gray-700 px-1 rounded text-gray-300">{t.manual}</span>}
                     </td>
                     <td className="p-4 font-mono">{trade.price}</td>
-                    <td className={`p-4 font-mono font-bold ${trade.profit === '—' ? 'text-gray-500' : isProfit ? 'text-green-500' : 'text-red-500'}`}>
+                    <td className={`p-4 font-mono font-bold ${!hasNumericProfit ? 'text-gray-500' : isProfit ? 'text-green-500' : 'text-red-500'}`}>
                       {trade.profit}
+                      {trade.hasCostBasisGap && (
+                        <span className="ml-1 text-[10px] text-amber-400" title="Missing historical buy cost basis">*</span>
+                      )}
                     </td>
                     <td className="p-4 text-gray-300 truncate max-w-[150px]">{trade.counterparty || 'N/A'}</td>
                     <td className="p-4">
-                      <button 
+                      <button
                         onClick={() => onDelete(trade.orderNo)}
                         className="text-gray-500 hover:text-red-400 transition-colors"
                       >
@@ -159,16 +161,16 @@ export const TradeTable: React.FC<TradeTableProps> = ({ trades, onDelete, t }) =
 
       {totalPages > 1 && (
         <div className="flex items-center justify-between p-4 border-t border-gray-800 bg-gray-900/30">
-          <button 
-            onClick={handlePrev} 
+          <button
+            onClick={handlePrev}
             disabled={currentPage === 1}
             className="p-2 rounded hover:bg-gray-700 disabled:opacity-50 disabled:cursor-not-allowed text-gray-400 hover:text-white"
           >
             <ChevronRight size={20} />
           </button>
-          <span className="text-gray-400 text-sm">صفحة {currentPage} من {totalPages}</span>
-          <button 
-            onClick={handleNext} 
+          <span className="text-gray-400 text-sm">Page {currentPage} / {totalPages}</span>
+          <button
+            onClick={handleNext}
             disabled={currentPage === totalPages}
             className="p-2 rounded hover:bg-gray-700 disabled:opacity-50 disabled:cursor-not-allowed text-gray-400 hover:text-white"
           >

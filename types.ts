@@ -32,8 +32,10 @@ export interface RawTradeData {
   "Order Type": string;
   "Asset Type": string;
   "Fiat Type": string;
+  "Total Price"?: string | number;
   "Price": string | number;
   "Quantity": string | number;
+  "Exchange rate"?: string | number;
   "Counterparty"?: string;
   "Couterparty"?: string; // Handle typo in some CSVs
   "Created Time": string;
@@ -58,6 +60,8 @@ export interface ProcessedTrade {
   holdTimeSeconds?: number;
   qty: number;
   fee: number;
+  hasCostBasisGap?: boolean;
+  missingCostQty?: number;
   total: number;
   sourceFile?: string;
 }
@@ -75,6 +79,10 @@ export interface TradeSummary {
   marketValue: string;
   unrealizedProfit: string;
   lastSellPrice?: string;
+  winRate?: string;
+  avgSellProfit?: string;
+  sellWithoutCostCount?: number;
+  unmatchedSellQty?: string;
 }
 
 // --- Theme and Language Types ---

@@ -187,7 +187,7 @@ export const TradeAnalysis: React.FC<TradeAnalysisProps> = ({ trades, originalDa
     { label: t.detailedSummary.totalProfit, value: `${periodSummary.totalProfit} ${fiat}`, color: 'text-green-400' },
     { label: t.detailedSummary.totalBuys, value: `${periodSummary.totalBuys} ${fiat}`, color: 'text-blue-400' },
     { label: t.detailedSummary.totalSells, value: `${periodSummary.totalSells} ${fiat}`, color: 'text-red-400' },
-    { label: t.detailedSummary.totalFees, value: `${periodSummary.totalFees} ${asset}`, color: 'text-orange-400' }, // Fees often in Asset in P2P
+    { label: t.detailedSummary.totalFees, value: `${periodSummary.totalFees} ${fiat}`, color: 'text-orange-400' },
     { label: t.detailedSummary.netProfit, value: `${periodSummary.netProfit} ${fiat}`, color: 'text-green-500' },
     { label: t.detailedSummary.buyCount, value: periodSummary.buyCount, color: 'text-text-main' },
     { label: t.detailedSummary.sellCount, value: periodSummary.sellCount, color: 'text-text-main' },
@@ -245,7 +245,7 @@ export const TradeAnalysis: React.FC<TradeAnalysisProps> = ({ trades, originalDa
              </div>
              <div className="bg-card p-4 rounded-xl border border-card-border flex flex-col justify-center items-center text-center">
                 <span className="text-text-muted text-xs uppercase font-bold mb-1">{t.detailedSummary.totalFees}</span>
-                <span className="text-xl font-bold text-orange-400 font-mono">{periodSummary.totalFees}</span>
+                <span className="text-xl font-bold text-orange-400 font-mono">{periodSummary.totalFees} {fiat}</span>
              </div>
              <div className="bg-card p-4 rounded-xl border border-card-border flex flex-col justify-center items-center text-center">
                 <span className="text-text-muted text-xs uppercase font-bold mb-1">{t.detailedSummary.buyCount}</span>
@@ -330,6 +330,11 @@ export const TradeAnalysis: React.FC<TradeAnalysisProps> = ({ trades, originalDa
       <h3 className="text-xl font-bold text-text-main mt-8 mb-4 px-2 border-r-4 border-primary mr-2">
          {t.title.includes("تحليل") ? "إحصائيات متقدمة" : "Advanced Stats"}
       </h3>
+      {(summary.sellWithoutCostCount || 0) > 0 && (
+        <div className="mb-4 bg-amber-900/20 border border-amber-700/40 rounded-xl px-4 py-3 text-sm text-amber-200">
+          {summary.sellWithoutCostCount} sell order(s) were excluded from realized profit due to missing historical buy cost basis.
+        </div>
+      )}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
         <div className="bg-card p-5 rounded-xl border border-card-border">
             <div className="text-text-muted text-sm mb-1 flex items-center gap-2"><Award size={16}/> {t.stats.maxBuy}</div>
