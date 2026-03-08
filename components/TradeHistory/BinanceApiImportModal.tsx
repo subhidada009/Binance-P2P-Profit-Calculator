@@ -10,8 +10,6 @@ interface BinanceApiImportModalProps {
   onImport: (options: BinanceApiImportOptions) => Promise<void>;
 }
 
-const PROXY_STORAGE_KEY = 'p2p_binance_proxy_url';
-
 const formatDateInput = (value: Date): string => {
   const year = value.getFullYear();
   const month = String(value.getMonth() + 1).padStart(2, '0');
@@ -33,13 +31,9 @@ export const BinanceApiImportModal: React.FC<BinanceApiImportModalProps> = ({
 
   const [apiKey, setApiKey] = useState('');
   const [apiSecret, setApiSecret] = useState('');
-  const [proxyUrl, setProxyUrl] = useState(() => localStorage.getItem(PROXY_STORAGE_KEY) || '');
+  const [proxyUrl, setProxyUrl] = useState('');
   const [startDate, setStartDate] = useState(formatDateInput(thirtyDaysAgo));
   const [endDate, setEndDate] = useState(formatDateInput(today));
-
-  useEffect(() => {
-    localStorage.setItem(PROXY_STORAGE_KEY, proxyUrl.trim());
-  }, [proxyUrl]);
 
   useEffect(() => {
     if (!isOpen) {
