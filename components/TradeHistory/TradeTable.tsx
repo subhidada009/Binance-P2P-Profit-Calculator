@@ -29,14 +29,23 @@ export const TradeTable: React.FC<TradeTableProps> = ({ trades, onDelete, t }) =
   const handleSort = (key: SortKey) => {
     if (sortKey === key) {
       if (sortDirection === 'asc') {
-        setSortDirection('desc');
+        if (key === 'order') {
+          setSortDirection(null);
+          setSortKey(null);
+        } else {
+          setSortDirection('desc');
+        }
       } else if (sortDirection === 'desc') {
-        setSortDirection(null);
-        setSortKey(null);
+        if (key === 'order') {
+          setSortDirection('asc');
+        } else {
+          setSortDirection(null);
+          setSortKey(null);
+        }
       }
     } else {
       setSortKey(key);
-      setSortDirection('asc');
+      setSortDirection(key === 'order' ? 'desc' : 'asc');
     }
     setCurrentPage(1);
   };
@@ -63,7 +72,9 @@ export const TradeTable: React.FC<TradeTableProps> = ({ trades, onDelete, t }) =
           break;
         }
         case 'order':
-          result = a.type.localeCompare(b.type);
+          // "Type" column shows trade amount text (e.g. Buy 149.0000 USDT),
+          // so sort this column by quantity.
+          result = a.qty - b.qty;
           break;
         case 'counterparty':
           result = (a.counterparty || '').localeCompare(b.counterparty || '');
@@ -139,7 +150,7 @@ export const TradeTable: React.FC<TradeTableProps> = ({ trades, onDelete, t }) =
                     <td className={`p-4 font-mono font-bold ${!hasNumericProfit ? 'text-gray-500' : isProfit ? 'text-green-500' : 'text-red-500'}`}>
                       {trade.profit}
                       {trade.hasCostBasisGap && (
-                        <span className="ml-1 text-[10px] text-amber-400" title="Missing historical buy cost basis">*</span>
+                        <span className="ml-1 text-[10px] text-amber-400" title="Part of this sell quantity has no earlier buy match">*</span>
                       )}
                     </td>
                     <td className="p-4 text-gray-300 truncate max-w-[150px]">{trade.counterparty || 'N/A'}</td>

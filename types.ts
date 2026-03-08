@@ -76,6 +76,7 @@ export interface TradeSummary {
   sellCount: number;
   remainingQty: string;
   remainingCost: string;
+  avgRemainingBuyPrice?: string;
   marketValue: string;
   unrealizedProfit: string;
   lastSellPrice?: string;

@@ -5,6 +5,8 @@ import { TradeFilters } from './TradeFilters';
 import { TradeTable } from './TradeTable';
 import { X } from 'lucide-react';
 import { parseTradeFile } from '../../utils/tradeLogic';
+import { BinanceApiImportModal } from './BinanceApiImportModal';
+import { importBinanceC2CTrades, BinanceApiImportOptions } from '../../services/binanceC2CService';
 
 interface TradeHistoryProps {
   rawData: RawTradeData[];
@@ -50,10 +52,25 @@ export const TradeHistory: React.FC<TradeHistoryProps> = ({
   guideT
 }) => {
   const [showManualModal, setShowManualModal] = useState(false);
-  const [lastImportSummary, setLastImportSummary] = useState<{
-    files: number;
-    importedRows: number;
+  const [showBinanceApiModal, setShowBinanceApiModal] = useState(false);
+  const [notice, setNotice] = useState<{
+    tone: 'success' | 'error';
+    message: string;
   } | null>(null);
+  const [apiImportState, setApiImportState] = useState<{
+    loading: boolean;
+    progressText: string;
+  }>({
+    loading: false,
+    progressText: '',
+  });
+  const isArabic = typeof document !== 'undefined' && document.documentElement.lang === 'ar';
+
+  const getCompletedRowCount = useCallback((rows: RawTradeData[]) => {
+    return rows.reduce((count, row) => {
+      return String(row.Status || '').trim().toLowerCase() === 'completed' ? count + 1 : count;
+    }, 0);
+  }, []);
 
   // Manual Form State
   const [mType, setMType] = useState('Buy');
@@ -97,16 +114,80 @@ export const TradeHistory: React.FC<TradeHistoryProps> = ({
   const handleProcessFiles = useCallback(async (files: File[]) => {
     try {
       const parsedByFile = await Promise.all(files.map((file) => parseTradeFile(file)));
-      const importedRows = parsedByFile.reduce((sum, rows) => sum + rows.length, 0);
-      setRawData((prev) => [...prev, ...parsedByFile.flat()]);
-      setLastImportSummary({
-        files: files.length,
-        importedRows
+      const parsedRows = parsedByFile.flat();
+      const importedRows = parsedRows.length;
+      const importedCompletedRows = getCompletedRowCount(parsedRows);
+      const nextRawData = [...rawData, ...parsedRows];
+      const totalCompletedRows = getCompletedRowCount(nextRawData);
+      const totalFiles = new Set(nextRawData.map((row) => row.sourceFile).filter(Boolean)).size;
+
+      setRawData((prev) => [...prev, ...parsedRows]);
+      setNotice({
+        tone: 'success',
+        message: isArabic
+          ? `??? ????? ${importedRows} ??? (${importedCompletedRows} ?????) ?? ${files.length} ???. ?????? ???????? ???? ${nextRawData.length} ??? (${totalCompletedRows} ?????) ?? ${totalFiles} ???.`
+          : `Added ${importedRows} rows (${importedCompletedRows} completed) from ${files.length} file(s). Active dataset: ${nextRawData.length} rows (${totalCompletedRows} completed) across ${totalFiles} file(s).`,
       });
     } catch (error) {
       console.error("Failed to process files", error);
+      setNotice({
+        tone: 'error',
+        message: isArabic
+          ? '??? ?? ????? ??????? ????????.'
+          : 'Failed to process the selected files.',
+      });
     }
-  }, [setRawData]);
+  }, [getCompletedRowCount, isArabic, rawData, setRawData]);
+
+  const handleBinanceApiImport = useCallback(async (options: BinanceApiImportOptions) => {
+    setApiImportState({
+      loading: true,
+      progressText: isArabic ? '???? ??????? ?? Binance...' : 'Connecting to Binance...',
+    });
+    setNotice(null);
+
+    try {
+      const result = await importBinanceC2CTrades({
+        ...options,
+        onProgress: (message) => {
+          setApiImportState({
+            loading: true,
+            progressText: message,
+          });
+        },
+      });
+
+      const nextRawData = [...rawData, ...result.rows];
+      const totalCompletedRows = getCompletedRowCount(nextRawData);
+      const totalFiles = new Set(nextRawData.map((row) => row.sourceFile).filter(Boolean)).size;
+
+      setRawData((prev) => [...prev, ...result.rows]);
+      setNotice({
+        tone: 'success',
+        message: isArabic
+          ? `??? ????? ${result.rows.length} ??? ????? ?? Binance API ??? ${result.requests} ???. ?????? ???????? ???? ${nextRawData.length} ??? (${totalCompletedRows} ?????) ?? ${totalFiles} ????.`
+          : `Added ${result.rows.length} completed rows from Binance API across ${result.requests} request(s). Active dataset: ${nextRawData.length} rows (${totalCompletedRows} completed) across ${totalFiles} source(s).`,
+      });
+      setShowBinanceApiModal(false);
+    } catch (error) {
+      const rawMessage = error instanceof Error ? error.message : 'Unknown Binance API error';
+      const normalizedMessage = rawMessage.includes('Unexpected token')
+        ? isArabic
+          ? '?? ??? ?????? ??? Proxy endpoint. ??? ?????? ?? ???? ?????? ??? GitHub Pages ???? Backend ?? Worker.'
+          : 'Proxy endpoint not found. This feature does not work directly on GitHub Pages without a backend or worker.'
+        : rawMessage;
+
+      setNotice({
+        tone: 'error',
+        message: normalizedMessage,
+      });
+    } finally {
+      setApiImportState({
+        loading: false,
+        progressText: '',
+      });
+    }
+  }, [getCompletedRowCount, isArabic, rawData, setRawData]);
 
   const handleRemoveFile = (fileName: string) => {
     if (window.confirm(`Delete all trades from file: ${fileName}?`)) {
@@ -131,7 +212,7 @@ export const TradeHistory: React.FC<TradeHistoryProps> = ({
       manual: true
     };
     setRawData(prev => [...prev, newTrade]);
-    setLastImportSummary(null);
+    setNotice(null);
     setShowManualModal(false);
     // Reset form
     setMPrice('');
@@ -146,6 +227,7 @@ export const TradeHistory: React.FC<TradeHistoryProps> = ({
       
       <TradeFilters 
         onFilesAdded={handleProcessFiles}
+        onBinanceApiImport={() => setShowBinanceApiModal(true)}
         uploadedFiles={uploadedFiles}
         onRemoveFile={handleRemoveFile}
         onClear={onClearData}
@@ -162,19 +244,25 @@ export const TradeHistory: React.FC<TradeHistoryProps> = ({
         guideT={guideT}
       />
 
-      {lastImportSummary && (
-        <div className="bg-emerald-900/20 border border-emerald-700/40 rounded-lg px-4 py-3 text-sm text-emerald-300">
-          Imported {lastImportSummary.importedRows} rows from {lastImportSummary.files} file(s).
+      {notice && (
+        <div
+          className={`rounded-lg border px-4 py-3 text-sm ${
+            notice.tone === 'success'
+              ? 'border-emerald-700/40 bg-emerald-900/20 text-emerald-300'
+              : 'border-red-700/40 bg-red-900/20 text-red-200'
+          }`}
+        >
+          {notice.message}
         </div>
       )}
 
       {(summary.sellWithoutCostCount || 0) > 0 && (
         <div className="bg-amber-900/20 border border-amber-700/40 rounded-lg px-4 py-3 text-sm text-amber-200">
-          {summary.sellWithoutCostCount} sell order(s) have missing historical buy cost.
-          Profit for these orders is marked as unknown.
+          {summary.sellWithoutCostCount} sell order(s) could not be fully matched to earlier buy records.
+          Only the matched quantity was included in profit.
           {(summary.unmatchedSellQty && parseFloat(summary.unmatchedSellQty) > 0) && (
             <span className="ml-2 text-amber-300">
-              Missing quantity: {summary.unmatchedSellQty} {asset}
+              Unmatched sell quantity: {summary.unmatchedSellQty} {asset}
             </span>
           )}
         </div>
@@ -235,6 +323,18 @@ export const TradeHistory: React.FC<TradeHistoryProps> = ({
           </div>
         </div>
       )}
+
+      <BinanceApiImportModal
+        isOpen={showBinanceApiModal}
+        loading={apiImportState.loading}
+        progressText={apiImportState.progressText}
+        onClose={() => {
+          if (!apiImportState.loading) {
+            setShowBinanceApiModal(false);
+          }
+        }}
+        onImport={handleBinanceApiImport}
+      />
     </div>
   );
 };

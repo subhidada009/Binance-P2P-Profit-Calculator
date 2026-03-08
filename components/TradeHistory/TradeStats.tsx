@@ -9,12 +9,16 @@ interface TradeStatsProps {
   t: Translation['history']['stats'];
 }
 
+const isBlankValue = (value?: string) => value === 'N/A' || value === '?';
+
 export const TradeStats: React.FC<TradeStatsProps> = ({ summary, fiat, asset, t }) => {
   const missingCostOrders = summary.sellWithoutCostCount || 0;
-  const winRateValue = summary.winRate && summary.winRate !== '—' ? `${summary.winRate}%` : 'N/A';
-  const avgSellProfitValue = summary.avgSellProfit && summary.avgSellProfit !== '—'
+  const winRateValue = summary.winRate && !isBlankValue(summary.winRate) ? `${summary.winRate}%` : 'N/A';
+  const avgSellProfitValue = summary.avgSellProfit && !isBlankValue(summary.avgSellProfit)
     ? `${summary.avgSellProfit} ${fiat}`
-    : `N/A ${fiat}`;
+    : 'N/A';
+  const withSuffix = (value: string, suffix: string) =>
+    isBlankValue(value) ? value : `${value} ${suffix}`;
 
   const cards = [
     { label: t.totalProfit, value: summary.totalProfit, icon: <TrendingUp size={20} className="text-green-400" />, color: 'border-green-500/30 bg-green-900/10', suffix: fiat },
@@ -33,7 +37,7 @@ export const TradeStats: React.FC<TradeStatsProps> = ({ summary, fiat, asset, t 
               {card.icon}
             </div>
             <div className="text-2xl font-bold text-white font-mono truncate">
-              {card.value} <span className="text-xs text-gray-500 ml-1">{card.suffix}</span>
+              {withSuffix(card.value, card.suffix)}
             </div>
             {card.label === t.unrealized && summary.lastSellPrice && (
               <div className="mt-2 text-[10px] text-gray-400 bg-black/20 rounded px-2 py-1 inline-block">

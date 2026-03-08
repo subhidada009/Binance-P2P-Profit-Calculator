@@ -508,34 +508,42 @@ export const parseTradeFile = async (file: File): Promise<RawTradeData[]> => {
 
 type InventoryBatch = {
   qty: number;
-  unitCost: number; // Fiat per asset unit.
+  unitPrice: number; // Buy price per asset unit in fiat.
   date: Date;
 };
 
-const consumeInventory = (
+type SellMatchResult = {
+  matchedQty: number;
+  unmatchedQty: number;
+  realizedProfit: number;
+  weightedHoldSeconds: number;
+};
+
+const matchSellToInventory = (
   inventory: InventoryBatch[],
-  qtyToConsume: number,
-  consumeDate: Date
-): { matchedQty: number; matchedCost: number; weightedHoldSeconds: number } => {
-  let remaining = qtyToConsume;
+  sellQty: number,
+  sellPrice: number,
+  sellDate: Date
+): SellMatchResult => {
+  let remainingSellQty = sellQty;
   let matchedQty = 0;
-  let matchedCost = 0;
+  let realizedProfit = 0;
   let weightedHoldSeconds = 0;
 
-  while (remaining > EPSILON && inventory.length > 0) {
+  while (remainingSellQty > EPSILON && inventory.length > 0) {
     const batch = inventory[0];
-    const usedQty = Math.min(batch.qty, remaining);
+    const usedQty = Math.min(batch.qty, remainingSellQty);
     const holdSeconds = Math.max(
       0,
-      (consumeDate.getTime() - batch.date.getTime()) / 1000
+      (sellDate.getTime() - batch.date.getTime()) / 1000
     );
 
     matchedQty += usedQty;
-    matchedCost += usedQty * batch.unitCost;
+    realizedProfit += (sellPrice - batch.unitPrice) * usedQty;
     weightedHoldSeconds += holdSeconds * usedQty;
 
     batch.qty -= usedQty;
-    remaining -= usedQty;
+    remainingSellQty -= usedQty;
 
     if (batch.qty <= EPSILON) {
       inventory.shift();
@@ -544,7 +552,12 @@ const consumeInventory = (
     }
   }
 
-  return { matchedQty, matchedCost, weightedHoldSeconds };
+  return {
+    matchedQty,
+    unmatchedQty: Math.max(0, remainingSellQty),
+    realizedProfit,
+    weightedHoldSeconds,
+  };
 };
 
 export const calculateTradeLogic = (
@@ -571,10 +584,31 @@ export const calculateTradeLogic = (
       parseTradeDate(b["Created Time"]).getTime()
   );
 
+  const fromBoundary = fromDate
+    ? (() => {
+        const [y, m, d] = fromDate.split("-").map(Number);
+        return new Date(y, (m || 1) - 1, d || 1, 0, 0, 0, 0);
+      })()
+    : null;
+
+  const toBoundary = toDate
+    ? (() => {
+        const [y, m, d] = toDate.split("-").map(Number);
+        return new Date(y, (m || 1) - 1, d || 1, 23, 59, 59, 999);
+      })()
+    : null;
+
+  const rowsForCalc = sortedForCalc.filter((row) => {
+    const tradeDate = parseTradeDate(row["Created Time"]);
+    if (fromBoundary && tradeDate < fromBoundary) return false;
+    if (toBoundary && tradeDate > toBoundary) return false;
+    return true;
+  });
+
   const inventory: InventoryBatch[] = [];
   const tradeDetails: ProcessedTrade[] = [];
 
-  for (const row of sortedForCalc) {
+  for (const row of rowsForCalc) {
     const price = parseNumber(row.Price);
     const qty = parseNumber(row.Quantity);
     const orderType = normalizeText(row["Order Type"]).toLowerCase();
@@ -591,16 +625,14 @@ export const calculateTradeLogic = (
     }
 
     if (orderType === "buy") {
-      const totalCost = total + feeFiat;
-      const unitCost = qty > EPSILON ? totalCost / qty : price;
-      inventory.push({ qty, unitCost, date: tradeDate });
+      inventory.push({ qty, unitPrice: price, date: tradeDate });
 
       tradeDetails.push({
         id: 0,
         time: row["Created Time"],
-        order: `Buy ${qty.toFixed(4)} ${targetAsset}`,
+        order: "Buy " + qty.toFixed(4) + " " + targetAsset,
         price: price.toFixed(2),
-        profit: "—",
+        profit: "N/A",
         orderNo,
         counterparty,
         type: "buy",
@@ -615,30 +647,19 @@ export const calculateTradeLogic = (
     }
 
     if (orderType === "sell") {
-      const { matchedQty, matchedCost, weightedHoldSeconds } = consumeInventory(
-        inventory,
-        qty,
-        tradeDate
-      );
+      const { matchedQty, unmatchedQty, realizedProfit, weightedHoldSeconds } =
+        matchSellToInventory(inventory, qty, price, tradeDate);
 
-      const missingCostQty = Math.max(0, qty - matchedQty);
-      const hasCostBasisGap = missingCostQty > EPSILON;
       const avgHoldTimeForTrade =
         matchedQty > EPSILON ? weightedHoldSeconds / matchedQty : 0;
-
-      let profit = "—";
-      if (!hasCostBasisGap) {
-        const netRevenue = total - feeFiat;
-        const netProfit = netRevenue - matchedCost;
-        profit = netProfit.toFixed(2);
-      }
+      const hasCostBasisGap = unmatchedQty > EPSILON;
 
       tradeDetails.push({
         id: 0,
         time: row["Created Time"],
-        order: `Sell ${qty.toFixed(4)} ${targetAsset}`,
+        order: "Sell " + qty.toFixed(4) + " " + targetAsset,
         price: price.toFixed(2),
-        profit,
+        profit: matchedQty > EPSILON ? realizedProfit.toFixed(2) : "N/A",
         orderNo,
         counterparty,
         type: "sell",
@@ -648,26 +669,14 @@ export const calculateTradeLogic = (
         qty,
         fee: feeFiat,
         hasCostBasisGap,
-        missingCostQty: hasCostBasisGap ? Number(missingCostQty.toFixed(6)) : undefined,
+        missingCostQty: hasCostBasisGap ? Number(unmatchedQty.toFixed(6)) : undefined,
         total,
         sourceFile: row.sourceFile,
       });
     }
   }
 
-  let displayedTrades = tradeDetails;
-
-  if (fromDate) {
-    const [y, m, d] = fromDate.split("-").map(Number);
-    const from = new Date(y, (m || 1) - 1, d || 1, 0, 0, 0, 0);
-    displayedTrades = displayedTrades.filter((t) => t.originalDate >= from);
-  }
-
-  if (toDate) {
-    const [y, m, d] = toDate.split("-").map(Number);
-    const to = new Date(y, (m || 1) - 1, d || 1, 23, 59, 59, 999);
-    displayedTrades = displayedTrades.filter((t) => t.originalDate <= to);
-  }
+  const displayedTrades = tradeDetails;
 
   let totalProfit = 0;
   let totalFees = 0;
@@ -685,7 +694,7 @@ export const calculateTradeLogic = (
 
     if (trade.type === "buy") {
       buyCount++;
-      totalBuys += trade.total + trade.fee;
+      totalBuys += trade.total;
       continue;
     }
 
@@ -695,36 +704,43 @@ export const calculateTradeLogic = (
     if (trade.hasCostBasisGap) {
       sellWithoutCostCount++;
       unmatchedSellQty += trade.missingCostQty || 0;
+    }
+
+    const parsedProfit = parseFloat(trade.profit);
+    if (!Number.isFinite(parsedProfit)) {
       continue;
     }
 
-    const parsedProfit = parseNumber(trade.profit);
     totalProfit += parsedProfit;
     validSellCount++;
-    if (parsedProfit > 0) profitableSellCount++;
-  }
-
-  let lastSellPriceVal = 0;
-  for (let i = sortedForCalc.length - 1; i >= 0; i--) {
-    if (normalizeText(sortedForCalc[i]["Order Type"]).toLowerCase() === "sell") {
-      lastSellPriceVal = parseNumber(sortedForCalc[i].Price);
-      break;
+    if (parsedProfit > 0) {
+      profitableSellCount++;
     }
   }
 
-  const remainingQty = inventory.reduce((sum, item) => sum + item.qty, 0);
-  const remainingCost = inventory.reduce((sum, item) => sum + item.unitCost * item.qty, 0);
+  const remainingQty = inventory.reduce((sum, batch) => sum + batch.qty, 0);
+  const remainingCost = inventory.reduce(
+    (sum, batch) => sum + batch.unitPrice * batch.qty,
+    0
+  );
+  const avgRemainingBuyPriceDisplay =
+    remainingQty > EPSILON ? (remainingCost / remainingQty).toFixed(6) : "N/A";
 
   const customMarketPrice = parseNumber(marketPriceStr);
-  const effectiveMarketPrice =
-    customMarketPrice > 0 ? customMarketPrice : lastSellPriceVal > 0 ? lastSellPriceVal : 0;
-
-  const marketValue = remainingQty * effectiveMarketPrice;
+  const hasCustomMarketPrice = customMarketPrice > 0;
+  const marketValue = remainingQty * customMarketPrice;
   const unrealized = marketValue - remainingCost;
 
+  const profitDisplay =
+    validSellCount > 0 ? totalProfit.toFixed(2) : sellCount > 0 ? "N/A" : "0.00";
   const winRate =
-    validSellCount > 0 ? ((profitableSellCount / validSellCount) * 100).toFixed(2) : "—";
-  const avgSellProfit = validSellCount > 0 ? (totalProfit / validSellCount).toFixed(2) : "—";
+    validSellCount > 0 ? ((profitableSellCount / validSellCount) * 100).toFixed(2) : "N/A";
+  const avgSellProfit =
+    validSellCount > 0 ? (totalProfit / validSellCount).toFixed(2) : "N/A";
+  const marketValueDisplay =
+    hasCustomMarketPrice ? marketValue.toFixed(2) : remainingQty <= EPSILON ? "0.00" : "N/A";
+  const unrealizedDisplay =
+    hasCustomMarketPrice ? unrealized.toFixed(2) : remainingQty <= EPSILON ? "0.00" : "N/A";
 
   const finalTrades = displayedTrades
     .map((trade, idx) => ({ ...trade, id: idx + 1 }))
@@ -733,18 +749,18 @@ export const calculateTradeLogic = (
   return {
     trades: finalTrades,
     summary: {
-      totalProfit: totalProfit.toFixed(2),
+      totalProfit: profitDisplay,
       totalBuys: totalBuys.toFixed(2),
       totalSells: totalSells.toFixed(2),
       totalFees: totalFees.toFixed(2),
-      netProfit: totalProfit.toFixed(2),
+      netProfit: profitDisplay,
       buyCount,
       sellCount,
       remainingQty: remainingQty.toFixed(6),
       remainingCost: remainingCost.toFixed(2),
-      marketValue: marketValue.toFixed(2),
-      unrealizedProfit: unrealized.toFixed(2),
-      lastSellPrice: lastSellPriceVal > 0 ? lastSellPriceVal.toFixed(2) : undefined,
+      avgRemainingBuyPrice: avgRemainingBuyPriceDisplay,
+      marketValue: marketValueDisplay,
+      unrealizedProfit: unrealizedDisplay,
       winRate,
       avgSellProfit,
       sellWithoutCostCount,

@@ -1,4 +1,4 @@
-
+﻿
 
 import React, { useState, useMemo } from 'react';
 import { ProcessedTrade, RawTradeData, Translation, TradeSummary } from '../../types';
@@ -60,6 +60,7 @@ export const TradeAnalysis: React.FC<TradeAnalysisProps> = ({ trades, originalDa
     let totalFees = 0;
     let buyCount = 0;
     let sellCount = 0;
+    let validSellProfitCount = 0;
 
     filteredTrades.forEach(t => {
       totalFees += t.fee || 0;
@@ -73,16 +74,23 @@ export const TradeAnalysis: React.FC<TradeAnalysisProps> = ({ trades, originalDa
         const p = parseFloat(t.profit);
         if (!isNaN(p)) {
             totalProfit += p;
+            validSellProfitCount++;
         }
       }
     });
 
+    const profitDisplay = validSellProfitCount > 0
+      ? totalProfit.toFixed(2)
+      : sellCount > 0
+        ? 'N/A'
+        : '0.00';
+
     return {
-        totalProfit: totalProfit.toFixed(2),
+        totalProfit: profitDisplay,
         totalBuys: totalBuyCost.toFixed(2),
         totalSells: totalSellRevenue.toFixed(2),
         totalFees: totalFees.toFixed(2),
-        netProfit: totalProfit.toFixed(2),
+        netProfit: profitDisplay,
         buyCount,
         sellCount
     };
@@ -137,7 +145,7 @@ export const TradeAnalysis: React.FC<TradeAnalysisProps> = ({ trades, originalDa
 
     const topCounterparty = Object.entries(counterpartyCount).sort((a, b) => b[1] - a[1])[0];
     
-    let avgHoldText = "—";
+    let avgHoldText = "â€”";
     if (sellTradesWithHoldTime > 0) {
       const avgSeconds = totalHoldTime / sellTradesWithHoldTime;
       const avgDays = avgSeconds / (24 * 3600);
@@ -149,7 +157,7 @@ export const TradeAnalysis: React.FC<TradeAnalysisProps> = ({ trades, originalDa
     return {
       maxBuy,
       maxSell,
-      topCp: topCounterparty ? `${topCounterparty[0]} (${topCounterparty[1]})` : "—",
+      topCp: topCounterparty ? `${topCounterparty[0]} (${topCounterparty[1]})` : "â€”",
       avgHold: avgHoldText
     };
   }, [filteredTrades]);
@@ -180,22 +188,26 @@ export const TradeAnalysis: React.FC<TradeAnalysisProps> = ({ trades, originalDa
   }, [filteredTrades]);
 
   const timeFilters = ['all', 'year', 'month', 'week', 'today'] as const;
+  const withSuffix = (value: string, suffix: string) =>
+    value === 'N/A' || value === 'â€”' ? value : `${value} ${suffix}`;
+  const avgRemainingPriceLabel = 'Avg Remaining Buy Price';
 
   // --- Detailed Summary Data ---
   // Asset = Crypto (e.g. USDT), Fiat = Local Currency (e.g. TRY, SAR)
   const detailCards = [
-    { label: t.detailedSummary.totalProfit, value: `${periodSummary.totalProfit} ${fiat}`, color: 'text-green-400' },
+    { label: t.detailedSummary.totalProfit, value: withSuffix(periodSummary.totalProfit, fiat), color: 'text-green-400' },
     { label: t.detailedSummary.totalBuys, value: `${periodSummary.totalBuys} ${fiat}`, color: 'text-blue-400' },
     { label: t.detailedSummary.totalSells, value: `${periodSummary.totalSells} ${fiat}`, color: 'text-red-400' },
     { label: t.detailedSummary.totalFees, value: `${periodSummary.totalFees} ${fiat}`, color: 'text-orange-400' },
-    { label: t.detailedSummary.netProfit, value: `${periodSummary.netProfit} ${fiat}`, color: 'text-green-500' },
+    { label: t.detailedSummary.netProfit, value: withSuffix(periodSummary.netProfit, fiat), color: 'text-green-500' },
     { label: t.detailedSummary.buyCount, value: periodSummary.buyCount, color: 'text-text-main' },
     { label: t.detailedSummary.sellCount, value: periodSummary.sellCount, color: 'text-text-main' },
     // Global Inventory Stats
     { label: t.detailedSummary.remainingQty, value: `${summary.remainingQty} ${asset}`, color: 'text-blue-300' },
     { label: t.detailedSummary.remainingCost, value: `${summary.remainingCost} ${fiat}`, color: 'text-gray-300' },
-    { label: t.detailedSummary.marketValue, value: `${summary.marketValue} ${fiat}`, color: 'text-yellow-400' },
-    { label: t.detailedSummary.unrealized, value: `${summary.unrealizedProfit} ${fiat}`, color: 'text-purple-400', isUnrealized: true },
+    { label: avgRemainingPriceLabel, value: withSuffix(summary.avgRemainingBuyPrice || 'N/A', fiat), color: 'text-cyan-300' },
+    { label: t.detailedSummary.marketValue, value: withSuffix(summary.marketValue, fiat), color: 'text-yellow-400' },
+    { label: t.detailedSummary.unrealized, value: withSuffix(summary.unrealizedProfit, fiat), color: 'text-purple-400', isUnrealized: true },
   ];
 
   return (
@@ -208,7 +220,20 @@ export const TradeAnalysis: React.FC<TradeAnalysisProps> = ({ trades, originalDa
                 <TrendingUp className="text-primary" />
                 {t.title}
             </h2>
-            <p className="text-text-muted text-sm">{t.totalProfit}: <span className={`font-mono font-bold text-lg ${parseFloat(totalProfitInPeriod) >= 0 ? 'text-green-400' : 'text-red-400'}`}>{totalProfitInPeriod} {fiat}</span></p>
+            <p className="text-text-muted text-sm">
+              {t.totalProfit}:{" "}
+              <span
+                className={`font-mono font-bold text-lg ${
+                  totalProfitInPeriod === 'N/A'
+                    ? 'text-text-main'
+                    : parseFloat(totalProfitInPeriod) >= 0
+                      ? 'text-green-400'
+                      : 'text-red-400'
+                }`}
+              >
+                {totalProfitInPeriod} {totalProfitInPeriod === 'N/A' ? '' : fiat}
+              </span>
+            </p>
         </div>
         
         <div className="flex bg-background p-1 rounded-lg mt-4 md:mt-0 border border-card-border">
@@ -265,7 +290,7 @@ export const TradeAnalysis: React.FC<TradeAnalysisProps> = ({ trades, originalDa
                 <TrendingUp size={18} className="text-green-400"/>
                 {t.charts.dailyProfit}
             </h3>
-            <ResponsiveContainer width="100%" height="85%">
+            <ResponsiveContainer width="100%" height="85%" minWidth={0} minHeight={240}>
                 <BarChart data={chartData}>
                     <CartesianGrid strokeDasharray="3 3" stroke="var(--color-card-border)" vertical={false} />
                     <XAxis dataKey="date" stroke="var(--color-text-muted)" tick={{ fontSize: 10 }} />
@@ -284,7 +309,7 @@ export const TradeAnalysis: React.FC<TradeAnalysisProps> = ({ trades, originalDa
                 <PieChartIcon size={18} className="text-blue-400"/>
                 {t.charts.buyVsSell}
             </h3>
-            <ResponsiveContainer width="100%" height="85%">
+            <ResponsiveContainer width="100%" height="85%" minWidth={0} minHeight={240}>
                 <PieChart>
                     <Pie
                         data={pieData}
@@ -308,7 +333,7 @@ export const TradeAnalysis: React.FC<TradeAnalysisProps> = ({ trades, originalDa
 
       {/* 4. Detailed Performance Summary Grid */}
       <h3 className="text-xl font-bold text-text-main mt-8 mb-4 px-2 border-r-4 border-primary mr-2">
-        {t.title.includes("تحليل") ? "ملخص الأداء التفصيلي" : "Detailed Performance Summary"}
+        {t.title.includes("ØªØ­Ù„ÙŠÙ„") ? "Ù…Ù„Ø®Øµ Ø§Ù„Ø£Ø¯Ø§Ø¡ Ø§Ù„ØªÙØµÙŠÙ„ÙŠ" : "Detailed Performance Summary"}
       </h3>
       <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
         {detailCards.map((card, idx) => (
@@ -328,11 +353,12 @@ export const TradeAnalysis: React.FC<TradeAnalysisProps> = ({ trades, originalDa
 
       {/* 5. Advanced Stats Grid */}
       <h3 className="text-xl font-bold text-text-main mt-8 mb-4 px-2 border-r-4 border-primary mr-2">
-         {t.title.includes("تحليل") ? "إحصائيات متقدمة" : "Advanced Stats"}
+         {t.title.includes("ØªØ­Ù„ÙŠÙ„") ? "Ø¥Ø­ØµØ§Ø¦ÙŠØ§Øª Ù…ØªÙ‚Ø¯Ù…Ø©" : "Advanced Stats"}
       </h3>
       {(summary.sellWithoutCostCount || 0) > 0 && (
         <div className="mb-4 bg-amber-900/20 border border-amber-700/40 rounded-xl px-4 py-3 text-sm text-amber-200">
-          {summary.sellWithoutCostCount} sell order(s) were excluded from realized profit due to missing historical buy cost basis.
+          {summary.sellWithoutCostCount} sell order(s) were only partially matched to earlier buys.
+          Profit includes only the matched quantity.
         </div>
       )}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
@@ -356,7 +382,7 @@ export const TradeAnalysis: React.FC<TradeAnalysisProps> = ({ trades, originalDa
 
       {/* 6. Peak Times */}
       <h3 className="text-xl font-bold text-text-main mt-8 mb-4 px-2 border-r-4 border-primary mr-2">
-        {t.title.includes("تحليل") ? "أوقات الذروة (بالساعة)" : "Peak Times (Hourly)"}
+        {t.title.includes("ØªØ­Ù„ÙŠÙ„") ? "Ø£ÙˆÙ‚Ø§Øª Ø§Ù„Ø°Ø±ÙˆØ© (Ø¨Ø§Ù„Ø³Ø§Ø¹Ø©)" : "Peak Times (Hourly)"}
       </h3>
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
         <div className="bg-gradient-to-br from-green-900/20 to-card p-6 rounded-2xl border border-green-900/30">
@@ -371,3 +397,4 @@ export const TradeAnalysis: React.FC<TradeAnalysisProps> = ({ trades, originalDa
     </div>
   );
 };
+

@@ -1,4 +1,4 @@
-import React from 'react';
+﻿import React from 'react';
 import {
   BarChart,
   Bar,
@@ -21,22 +21,22 @@ interface ProfitChartsProps {
 export const ProfitCharts: React.FC<ProfitChartsProps> = ({ results, inputs, title }) => {
   const data = [
     {
-      name: 'التكلفة',
+      name: 'Ø§Ù„ØªÙƒÙ„ÙØ©',
       value: results.totalCost,
       color: '#474D57' // Gray
     },
     {
-      name: 'العائد',
+      name: 'Ø§Ù„Ø¹Ø§Ø¦Ø¯',
       value: results.totalRevenue,
       color: '#3b82f6' // Blue
     },
     {
-      name: 'الرسوم',
+      name: 'Ø§Ù„Ø±Ø³ÙˆÙ…',
       value: results.totalFees,
       color: '#ef4444' // Red
     },
     {
-      name: 'الربح',
+      name: 'Ø§Ù„Ø±Ø¨Ø­',
       value: results.netProfit,
       color: results.netProfit >= 0 ? '#10b981' : '#ef4444' // Green or Red
     }
@@ -44,8 +44,8 @@ export const ProfitCharts: React.FC<ProfitChartsProps> = ({ results, inputs, tit
 
   return (
     <div className="bg-gray-800 rounded-2xl p-6 border border-gray-700 shadow-xl h-96 w-full">
-      <h3 className="text-lg font-bold text-white mb-6 border-b border-gray-700 pb-2">{title || 'تحليل بياني للصفقة'}</h3>
-      <ResponsiveContainer width="100%" height="85%">
+      <h3 className="text-lg font-bold text-white mb-6 border-b border-gray-700 pb-2">{title || 'ØªØ­Ù„ÙŠÙ„ Ø¨ÙŠØ§Ù†ÙŠ Ù„Ù„ØµÙÙ‚Ø©'}</h3>
+      <ResponsiveContainer width="100%" height="85%" minWidth={0} minHeight={240}>
         <BarChart
           data={data}
           margin={{
@@ -73,7 +73,7 @@ export const ProfitCharts: React.FC<ProfitChartsProps> = ({ results, inputs, tit
           <Tooltip
             cursor={{ fill: '#1f2937' }}
             contentStyle={{ backgroundColor: '#111827', borderColor: '#374151', borderRadius: '8px', color: '#fff' }}
-            formatter={(value: number) => [`${value.toFixed(2)} ${inputs.currencySymbol}`, 'القيمة']}
+            formatter={(value: number) => [`${value.toFixed(2)} ${inputs.currencySymbol}`, 'Ø§Ù„Ù‚ÙŠÙ…Ø©']}
           />
           <ReferenceLine y={0} stroke="#666" />
           <Bar dataKey="value" radius={[4, 4, 0, 0]}>

@@ -1,5 +1,3 @@
-
-
 import React from 'react';
 import { TradeSummary, Translation } from '../types';
 import { TrendingUp, Wallet, DollarSign, Activity } from 'lucide-react';
@@ -11,12 +9,17 @@ interface CalculatorSummaryProps {
   t: Translation['calculatorSummary'];
 }
 
+const isBlankValue = (value?: string) => value === 'N/A' || value === '?';
+
 export const CalculatorSummary: React.FC<CalculatorSummaryProps> = ({ summary, fiat, asset, t }) => {
+  const withSuffix = (value: string, suffix: string) =>
+    isBlankValue(value) ? value : `${value} ${suffix}`;
+
   const cards = [
-    { label: t.totalProfit, value: summary.totalProfit, icon: <TrendingUp size={20} className="text-green-400" />, color: "border-green-500/20 bg-green-900/5", suffix: fiat },
-    { label: t.remainingQty, value: summary.remainingQty, icon: <Wallet size={20} className="text-blue-400" />, color: "border-blue-500/20 bg-blue-900/5", suffix: asset },
-    { label: t.marketValue, value: summary.marketValue, icon: <DollarSign size={20} className="text-yellow-400" />, color: "border-yellow-500/20 bg-yellow-900/5", suffix: fiat },
-    { label: t.unrealized, value: summary.unrealizedProfit, icon: <Activity size={20} className="text-purple-400" />, color: "border-purple-500/20 bg-purple-900/5", suffix: fiat },
+    { label: t.totalProfit, value: summary.totalProfit, icon: <TrendingUp size={20} className="text-green-400" />, color: 'border-green-500/20 bg-green-900/5', suffix: fiat },
+    { label: t.remainingQty, value: summary.remainingQty, icon: <Wallet size={20} className="text-blue-400" />, color: 'border-blue-500/20 bg-blue-900/5', suffix: asset },
+    { label: t.marketValue, value: summary.marketValue, icon: <DollarSign size={20} className="text-yellow-400" />, color: 'border-yellow-500/20 bg-yellow-900/5', suffix: fiat },
+    { label: t.unrealized, value: summary.unrealizedProfit, icon: <Activity size={20} className="text-purple-400" />, color: 'border-purple-500/20 bg-purple-900/5', suffix: fiat },
   ];
 
   return (
@@ -28,11 +31,11 @@ export const CalculatorSummary: React.FC<CalculatorSummaryProps> = ({ summary, f
             {card.icon}
           </div>
           <div className="text-2xl font-bold text-text-main font-mono truncate">
-            {card.value} <span className="text-xs text-text-muted ml-1">{card.suffix}</span>
+            {withSuffix(card.value, card.suffix)}
           </div>
           {card.label === t.unrealized && summary.lastSellPrice && (
             <div className="mt-2 text-[10px] text-text-muted bg-background/20 rounded px-2 py-1 inline-block">
-               {t.basedOnLast} {summary.lastSellPrice} {fiat}
+              {t.basedOnLast} {summary.lastSellPrice} {fiat}
             </div>
           )}
         </div>

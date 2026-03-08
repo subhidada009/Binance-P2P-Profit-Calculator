@@ -1,4 +1,4 @@
-import React from 'react';
+﻿import React from 'react';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, PieChart, Pie, Cell, Legend } from 'recharts';
 import { ProcessedTrade } from '../../types';
 
@@ -31,8 +31,8 @@ export const TradeCharts: React.FC<TradeChartsProps> = ({ trades }) => {
     }));
 
   const pieData = [
-    { name: 'شراء', value: buyCount, color: '#3b82f6' },
-    { name: 'بيع', value: sellCount, color: '#ef4444' },
+    { name: 'Ø´Ø±Ø§Ø¡', value: buyCount, color: '#3b82f6' },
+    { name: 'Ø¨ÙŠØ¹', value: sellCount, color: '#ef4444' },
   ];
 
   if (trades.length === 0) return null;
@@ -41,8 +41,8 @@ export const TradeCharts: React.FC<TradeChartsProps> = ({ trades }) => {
     <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-8">
       {/* Daily Profit Chart */}
       <div className="bg-[#1E2329] p-6 rounded-xl border border-gray-800 shadow-lg h-80">
-        <h3 className="text-white font-bold mb-4 border-b border-gray-700 pb-2">الربح اليومي</h3>
-        <ResponsiveContainer width="100%" height="90%">
+        <h3 className="text-white font-bold mb-4 border-b border-gray-700 pb-2">Ø§Ù„Ø±Ø¨Ø­ Ø§Ù„ÙŠÙˆÙ…ÙŠ</h3>
+        <ResponsiveContainer width="100%" height="90%" minWidth={0} minHeight={220}>
           <BarChart data={chartData}>
             <CartesianGrid strokeDasharray="3 3" stroke="#374151" vertical={false} />
             <XAxis dataKey="date" stroke="#9ca3af" tick={{ fontSize: 10 }} />
@@ -57,8 +57,8 @@ export const TradeCharts: React.FC<TradeChartsProps> = ({ trades }) => {
 
       {/* Buy vs Sell Chart */}
       <div className="bg-[#1E2329] p-6 rounded-xl border border-gray-800 shadow-lg h-80">
-        <h3 className="text-white font-bold mb-4 border-b border-gray-700 pb-2">صفقات الشراء مقابل البيع</h3>
-        <ResponsiveContainer width="100%" height="90%">
+        <h3 className="text-white font-bold mb-4 border-b border-gray-700 pb-2">ØµÙÙ‚Ø§Øª Ø§Ù„Ø´Ø±Ø§Ø¡ Ù…Ù‚Ø§Ø¨Ù„ Ø§Ù„Ø¨ÙŠØ¹</h3>
+        <ResponsiveContainer width="100%" height="90%" minWidth={0} minHeight={220}>
           <PieChart>
             <Pie
               data={pieData}

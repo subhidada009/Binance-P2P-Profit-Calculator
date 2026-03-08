@@ -5,6 +5,7 @@ import { BinanceGuideModal } from './BinanceGuideModal';
 
 interface TradeFiltersProps {
   onFilesAdded: (files: File[]) => void;
+  onBinanceApiImport: () => void;
   uploadedFiles: string[];
   onRemoveFile: (fileName: string) => void;
   onClear: () => void;
@@ -28,6 +29,7 @@ interface TradeFiltersProps {
 
 export const TradeFilters: React.FC<TradeFiltersProps> = ({
   onFilesAdded,
+  onBinanceApiImport,
   uploadedFiles,
   onRemoveFile,
   onClear,
@@ -52,6 +54,7 @@ export const TradeFilters: React.FC<TradeFiltersProps> = ({
   const [showGuide, setShowGuide] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const dragCounter = useRef(0);
+  const isArabic = typeof document !== 'undefined' && document.documentElement.lang === 'ar';
 
   useEffect(() => {
     const handleDragEnter = (e: DragEvent) => {
@@ -230,6 +233,15 @@ export const TradeFilters: React.FC<TradeFiltersProps> = ({
             >
               <CloudUpload size={16} />
               <span>{t.upload}</span>
+            </button>
+
+            <button
+              type="button"
+              onClick={onBinanceApiImport}
+              className="flex items-center gap-2 rounded-lg border border-sky-700/50 bg-sky-900/30 px-4 py-2 text-sm font-bold text-sky-200 transition-colors hover:bg-sky-900/50"
+            >
+              <Download size={16} />
+              <span>{isArabic ? 'مزامنة Binance API' : 'Binance API'}</span>
             </button>
 
              {/* Info / Guide Button */}
